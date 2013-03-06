@@ -20,7 +20,8 @@ typedef void* TASK_Q_ELEMENT;
 typedef enum TASK_ID_E{
     TASK_TIMER,
     TASK_TASK1,
-    TASK_TASK2
+    TASK_TASK2,
+    TASK_MAX_SIZE
 }TASK_ID;
 
 typedef enum TASK_STATE_ENUM{
@@ -32,27 +33,47 @@ typedef enum TASK_STATE_ENUM{
 
 typedef void (*TASK_FUNCTION)(TASK_EVENT event, TASK_Q_ELEMENT data);
 
+typedef void (*TASK)(void* data);
+
+typedef struct TASK_ELEMENT_S{
+    TASK task;
+    void * data;
+}TASK_ELEMENT;
+
+
+typedef struct TASK_DELAY_ELEMENT_S{
+    BOOL isValid;
+    UINT16 counter;
+    TASK_ELEMENT element;
+}TASK_DELAY_ELEMENT;
+
+typedef enum TASK_PRIORITY_E{
+    TASK_PRIORITY_ISR,
+    TASK_PRIORITY_NONTIMED,
+    TASK_PRIORITY_MAX,
+    TASK_PRIORITY_TIMED
+}TASK_PRIORITY;
+
 typedef struct TASK_QUEUE_S{
-    UINT16 queueIndexIn;
-    UINT16 queueIndexOut;
-    UINT16 queueCount;
-    TASK_Q_ELEMENT data[TASKQUEUE_MAX_SIZE];
-}TASK_Q;
+    UINT16 in;
+    UINT16 out;
+    UINT16 count;
+    TASK_ELEMENT queue[TASKQUEUE_MAX_SIZE];
+}TASK_QUEUE;
 
-typedef struct TASK_S{
-    TASK_STATE state;
-    TASK_FUNCTION function;
-    TASK_Q eventQ;
-    TASK_Q dataQ;
-}TASK;
+BOOL taskSubmit(TASK_PRIORITY priority, TASK task, void *data, UINT16 delay);
+#define TASK_SUBMIT_ISR(t,d) taskSubmit(TASK_PRIORITY_ISR,t,d,NULL)
+#define TASK_SUBMIT_TIMED(t,d,del) taskSubmit(TASK_PRIORITY_TIMED,t,d,del)
+#define TASK_SUBMIT_NORMAL(t,d) taskSubmit(TASK_PRIORITY_NONTIMED,t,d,NULL)
 
-void taskSchedule(TASK_ID task, TASK_EVENT event, TASK_DATA data);
-void taskRegister(TASK_ID task, TASK_FUNCTION function);
-void taskUnschedule(void);
+
+//void taskSubmit_ISR(TASK task, void *data);
+//void taskSubmit_Timed(TASK task, void *data, UINT16 delay, BOOL repeat);
+//void taskSubmit(TASK task, void *data);
 void taskProcess(void);
+void taskProcessDelayList(void);
 
-void taskEnqueue(TASK_Q *queue, TASK_Q_ELEMENT element);
-TASK_Q_ELEMENT taskDequeue(TASK_Q *queue);
+
 
 
 #endif	/* TASK_H */

@@ -83,12 +83,10 @@ volatile UINT16 msCount = 1000;
 
 void T2Interrupt_ISR(void)
 {
+    UINT8 i;
     _T2IF = 0;
-    if(!msCount--)
-    {
-        msCount = 1000;
-        taskSchedule(TASK_TIMER, 0x01, 0xAA);
-    }
+
+    taskProcessDelayList();
     /* For delay_ms() */
 //    if(!delayCount--) delayExpire = TRUE;
 //    lcdRefresh();
@@ -101,21 +99,26 @@ void _ISR _T2Interrupt(void)
 
 void timerTask(TASK_EVENT event, TASK_Q_ELEMENT data)
 {
-
     LATAbits.LATA1 = !LATAbits.LATA1;
 }
 
-void task1(TASK_EVENT event, TASK_Q_ELEMENT data)
+void task1(void * data)
 {
-    LATAbits.LATA0 = 1;
-    taskSchedule(TASK_TASK2, 0x01, 0x00);
+    LATAbits.LATA0 = !LATAbits.LATA0;
+    TASK_SUBMIT_TIMED(task1,0,1000);
 }
 
-void task2(TASK_EVENT event, TASK_Q_ELEMENT data)
+void task2(void * data)
 {
-    LATAbits.LATA0 = 0;
-    taskSchedule(TASK_TASK1, 0x0A, 0x55);
+    LATAbits.LATA1 = !LATAbits.LATA1;
+    TASK_SUBMIT_TIMED(task2,0,500);
 }
+
+//void task2(TASK_EVENT event, TASK_Q_ELEMENT data)
+//{
+//    LATAbits.LATA0 = 0;
+//    taskSchedule(TASK_TASK1, 0x00, 0x00);
+//}
 
 void tickTimerSetup(void)
 {
@@ -149,11 +152,14 @@ int main(void) {
     TRISAbits.TRISA0 = 0;
     TRISAbits.TRISA1 = 0;
 
-    taskRegister(TASK_TIMER,timerTask);
-    taskRegister(TASK_TASK1,task1);
-    taskRegister(TASK_TASK2,task2);
-//
-    taskSchedule(TASK_TASK1, 0x33, 0x11);
+    TASK_SUBMIT_NORMAL(task1,0);
+    TASK_SUBMIT_NORMAL(task2,0);
+
+//    taskRegister(TASK_TIMER,timerTask);
+//    taskRegister(TASK_TASK1,task1);
+//    taskRegister(TASK_TASK2,task2);
+////
+//    taskSchedule(TASK_TASK1, 0x00, 0x00);
 
     while(1){
         taskProcess();
