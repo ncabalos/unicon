@@ -10,6 +10,9 @@
 #include <p24Fxxxx.h>
 #include <GenericTypeDefs.h>
 #include "task.h"
+#include "datastructure.h"
+#include "queue.h"
+#include "stack.h"
 
 // CONFIG3
 // Write Protection Flash Page Segment Boundary (Highest Page (same as page 170))
@@ -97,21 +100,17 @@ void _ISR _T2Interrupt(void)
     T2Interrupt_ISR();
 }
 
-void timerTask(TASK_EVENT event, TASK_Q_ELEMENT data)
+void task1(EVENT event, void * data)
 {
-    LATAbits.LATA1 = !LATAbits.LATA1;
-}
-
-void task1(void * data)
-{
+    UINT16 test = (UINT16)data;
+    test++;
     LATAbits.LATA0 = !LATAbits.LATA0;
-    TASK_SUBMIT_TIMED(task1,0,1000);
+    TASK_SUBMIT_TIMED(task1,NULL,(void *)test,test);
 }
-
-void task2(void * data)
+void task2(EVENT event,void * data)
 {
     LATAbits.LATA1 = !LATAbits.LATA1;
-    TASK_SUBMIT_TIMED(task2,0,500);
+    TASK_SUBMIT_TIMED(task2,NULL,NULL,250);
 }
 
 //void task2(TASK_EVENT event, TASK_Q_ELEMENT data)
@@ -144,7 +143,16 @@ void tickTimerStart(void)
     TICKTIMER_ENABLE = 1;
 }
 
+QUEUE *testQueue;
+STACK *testStack;
+
 int main(void) {
+    UINT8 i = 0;
+
+    UINT8 w = 1;
+    UINT8 x = 2;
+    UINT8 y = 3;
+    UINT8 z = 4;
 
     tickTimerSetup();
     tickTimerStart();
@@ -152,8 +160,36 @@ int main(void) {
     TRISAbits.TRISA0 = 0;
     TRISAbits.TRISA1 = 0;
 
-    TASK_SUBMIT_NORMAL(task1,0);
-    TASK_SUBMIT_NORMAL(task2,0);
+    testQueue = queue();
+    testStack = stack();
+
+    push(testStack, &z);
+    push(testStack, &y);
+    push(testStack, &x);
+    push(testStack, &w);
+
+    i = *(UINT8 *)pop(testStack);
+    i = *(UINT8 *)pop(testStack);
+    i = *(UINT8 *)pop(testStack);
+    i = *(UINT8 *)pop(testStack);
+
+    enqueue(testQueue, &z);
+    enqueue(testQueue, &y);
+    enqueue(testQueue, &x);
+    enqueue(testQueue, &w);
+
+
+    i = *(UINT8 *)dequeue(testQueue);
+    i = *(UINT8 *)dequeue(testQueue);
+    i = *(UINT8 *)dequeue(testQueue);
+    i = *(UINT8 *)dequeue(testQueue);
+
+
+
+    
+
+    TASK_SUBMIT_NORMAL(task1,NULL,(void *)1);
+    TASK_SUBMIT_NORMAL(task2,NULL,NULL);
 
 //    taskRegister(TASK_TIMER,timerTask);
 //    taskRegister(TASK_TASK1,task1);

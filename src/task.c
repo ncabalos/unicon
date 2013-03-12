@@ -8,7 +8,7 @@
 TASK_QUEUE taskQueues[TASK_PRIORITY_MAX];
 TASK_DELAY_ELEMENT taskDelayList[TASKQUEUE_MAX_SIZE];
 
-BOOL taskSubmit(TASK_PRIORITY priority, TASK task, void *data, UINT16 delay) {
+BOOL taskSubmit(TASK_PRIORITY priority, TASK task, EVENT event, void *data, UINT16 delay) {
     TASK_QUEUE *queue;
     TASK_ELEMENT *element;
     TASK_DELAY_ELEMENT *delayElement;
@@ -22,6 +22,7 @@ BOOL taskSubmit(TASK_PRIORITY priority, TASK task, void *data, UINT16 delay) {
             element = &queue->queue[queue->in];
             element->task = task;
             element->data = data;
+            element->event = event;
 
             queue->in++;
             if (queue->in == TASKQUEUE_MAX_SIZE) queue->in = 0;
@@ -39,6 +40,7 @@ BOOL taskSubmit(TASK_PRIORITY priority, TASK task, void *data, UINT16 delay) {
                 element = &delayElement->element;
                 element->task = task;
                 element->data = data;
+                element->event = event;
                 return TRUE;
             }
         }
@@ -60,7 +62,7 @@ void taskProcess(void) {
             queue->out++;
             if (queue->out == TASKQUEUE_MAX_SIZE) queue->out = 0;
             queue->count--;
-            element->task(element->data);
+            element->task(element->event, element->data);
             break;
         }
     }
@@ -71,7 +73,7 @@ void taskProcess(void) {
         if(delayElement->isValid){
             if(delayElement->counter == 0){
                 element = &delayElement->element;
-                TASK_SUBMIT_NORMAL(element->task, element->data);
+                TASK_SUBMIT_NORMAL(element->task, element->event, element->data);
                 delayElement->isValid = FALSE;
             }
         }
