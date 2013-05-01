@@ -4,14 +4,15 @@
  *
  * Created on November 12, 2012, 9:47 PM
  */
-
+#define USE_AND_OR
 #include <stdio.h>
 #include <stdlib.h>
 #include <p24Fxxxx.h>
 #include <GenericTypeDefs.h>
-#include "task.h"
+#include "uckernel.h"
+#include "PIC24F_plib.h"
 #include "datastructure.h"
-#include "queue.h"
+//#include "queue.h"
 #include "stack.h"
 
 // CONFIG3
@@ -30,7 +31,7 @@ _CONFIG3(WPFP_WPFP511 & WPDIS_WPDIS & WPCFG_WPCFGDIS & WPEND_WPENDMEM)
 // Oscillator Select (Primary oscillator (XT, HS, EC) with PLL module (XTPLL,HSPLL, ECPLL))
 // 96MHz PLL Disable (Enabled)
 // USB 96 MHz PLL Prescaler Select bits (Oscillator input divided by 2 (8MHz input))
- // Internal External Switch Over Mode (IESO mode (Two-speed start-up)disabled)
+// Internal External Switch Over Mode (IESO mode (Two-speed start-up)disabled)
 _CONFIG2(POSCMOD_XT & DISUVREG_OFF & IOL1WAY_ON & OSCIOFNC_OFF & FCKSM_CSDCMD & FNOSC_PRIPLL & PLL_96MHZ_ON & PLLDIV_DIV2 & IESO_OFF)
 
 // CONFIG1
@@ -44,163 +45,47 @@ _CONFIG2(POSCMOD_XT & DISUVREG_OFF & IOL1WAY_ON & OSCIOFNC_OFF & FCKSM_CSDCMD & 
 // JTAG Port Enable (JTAG port is disabled)
 _CONFIG1(WDTPS_PS32768 & FWPSA_PR128 & WINDIS_OFF & FWDTEN_OFF & ICS_PGx2 & GWRP_OFF & GCP_OFF & JTAGEN_OFF & BKBUG_ON)
 
-#define USE_PLL 1
-#define TICKTIMER_NUM 2
-#define TICKTIMER_PRESCALE (8UL)
-
-#if USE_PLL == 1
-#define FREQ 32000000
-#else
-#define FREQ 8000000
-#endif
-
-#if TICKTIMER_NUM == 2
-#define TICKTIMER_ENABLE_INT IEC0bits.T2IE
-#define TICKTIMER_INTERRUPT IFS0bits.T2IF
-#define TICKTIMER_ENABLE T2CONbits.TON
-#elif TICKTIMER_NUM == 4
-#define TICKTIMER_ENABLE_INT TMR4IE
-#define TICKTIMER_INTERRUPT TMR4IF
-#define TICKTIMER_ENABLE TMR4ON
-#elif TICKTIMER_NUM == 6
-#define TICKTIMER_ENABLE_INT TMR6IE
-#define TICKTIMER_INTERRUPT TMR6IF
-#define TICKTIMER_ENABLE TMR6ON
-#endif
-
-#if TICKTIMER_PRESCALE == 1
-#define TICKTIMER_PRESCALE_BITS (0)
-#elif TICKTIMER_PRESCALE == 8
-#define TICKTIMER_PRESCALE_BITS (1)
-#elif TICKTIMER_PRESCALE == 64
-#define TICKTIMER_PRESCALE_BITS (2)
-#elif TICKTIMER_PRESCALE == 256
-#define TICKTIMER_PRESCALE_BITS (3)
-#endif
-
-#define TICKTIMER_PR_VALUE (FREQ /(2UL * TICKTIMER_PRESCALE * 1000UL ))
 
 
-volatile UINT16 msCount = 1000;
-
-
-void T2Interrupt_ISR(void)
+void serio_receive_handler(uckernel_task_event event, uckernel_task_data data)
 {
-    UINT8 i;
-    _T2IF = 0;
+	uint8_t msg[32];
+	uint16_t cnt = serio_data_available();
 
-    taskProcessDelayList();
-    /* For delay_ms() */
-//    if(!delayCount--) delayExpire = TRUE;
-//    lcdRefresh();
+	if(cnt){
+		serio_read_n(msg,cnt);
+		serio_write_n(msg,cnt);
+	}
+	
+	LATAbits.LATA0 = !LATAbits.LATA0;
 }
 
-void _ISR _T2Interrupt(void)
+void task2(uckernel_task_event event, uckernel_task_data data)
 {
-    T2Interrupt_ISR();
+	LATAbits.LATA1 = !LATAbits.LATA1;
+	uckernel_submit_timed_task(task2, NULL, NULL, 200);
 }
 
-void task1(EVENT event, void * data)
+#define CRITICAL_SECTION_START asm volatile ("disi #0x3FFF");
+#define CRITICAL_SECTION_END asm volatile ("disi #0");
+
+int main(void)
 {
-    UINT16 test = (UINT16)data;
-    test++;
-    LATAbits.LATA0 = !LATAbits.LATA0;
-    TASK_SUBMIT_TIMED(task1,NULL,(void *)test,test);
-}
-void task2(EVENT event,void * data)
-{
-    LATAbits.LATA1 = !LATAbits.LATA1;
-    TASK_SUBMIT_TIMED(task2,NULL,NULL,250);
-}
+	tick_timer_init();
+	tick_timer_start();
 
-//void task2(TASK_EVENT event, TASK_Q_ELEMENT data)
-//{
-//    LATAbits.LATA0 = 0;
-//    taskSchedule(TASK_TASK1, 0x00, 0x00);
-//}
+	TRISAbits.TRISA0 = 0;
+	TRISAbits.TRISA1 = 0;
 
-void tickTimerSetup(void)
-{
+	serio_init(serio_receive_handler);
 
-#if TICKTIMER_NUM == 2
-    T2CONbits.TCKPS = TICKTIMER_PRESCALE_BITS;
-    PR2 = TICKTIMER_PR_VALUE;
-#elif TICKTIMER_NUM == 4
-    T4CONbits.T4CKPS = TICKTIMER_PRESCALE_BITS;
-    T4CONbits.T4OUTPS = TICKTIMER_POSTSCALE_BITS;
-    PR4 = TICKTIMER_PR_VALUE;
-#elif TICKTIMER_NUM == 6
-    T6CONbits.T6CKPS = TICKTIMER_PRESCALE_BITS;
-    T6CONbits.T6OUTPS = TICKTIMER_POSTSCALE_BITS;
-    PR6 = TICKTIMER_PR_VALUE;
-#endif
+	uckernel_init();
 
-    TICKTIMER_INTERRUPT = 0;
-    TICKTIMER_ENABLE_INT = 1;
-}
-void tickTimerStart(void)
-{
-    TICKTIMER_ENABLE = 1;
-}
-
-QUEUE *testQueue;
-STACK *testStack;
-
-int main(void) {
-    UINT8 i = 0;
-
-    UINT8 w = 1;
-    UINT8 x = 2;
-    UINT8 y = 3;
-    UINT8 z = 4;
-
-    tickTimerSetup();
-    tickTimerStart();
-
-    TRISAbits.TRISA0 = 0;
-    TRISAbits.TRISA1 = 0;
-
-    testQueue = queue();
-    testStack = stack();
-
-    push(testStack, &z);
-    push(testStack, &y);
-    push(testStack, &x);
-    push(testStack, &w);
-
-    i = *(UINT8 *)pop(testStack);
-    i = *(UINT8 *)pop(testStack);
-    i = *(UINT8 *)pop(testStack);
-    i = *(UINT8 *)pop(testStack);
-
-    enqueue(testQueue, &z);
-    enqueue(testQueue, &y);
-    enqueue(testQueue, &x);
-    enqueue(testQueue, &w);
-
-
-    i = *(UINT8 *)dequeue(testQueue);
-    i = *(UINT8 *)dequeue(testQueue);
-    i = *(UINT8 *)dequeue(testQueue);
-    i = *(UINT8 *)dequeue(testQueue);
-
-
-
-    
-
-    TASK_SUBMIT_NORMAL(task1,NULL,(void *)1);
-    TASK_SUBMIT_NORMAL(task2,NULL,NULL);
-
-//    taskRegister(TASK_TIMER,timerTask);
-//    taskRegister(TASK_TASK1,task1);
-//    taskRegister(TASK_TASK2,task2);
-////
-//    taskSchedule(TASK_TASK1, 0x00, 0x00);
-
-    while(1){
-        taskProcess();
-    }
-    return (EXIT_SUCCESS);
+	uckernel_submit_normal_task(task2, NULL, NULL);
+	while (1) {
+		uckernel_process_tasks();
+	}
+	return(EXIT_SUCCESS);
 }
 
 

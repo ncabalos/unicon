@@ -54,6 +54,6 @@ void * top(STACK * s){
     return s->top->data;
 }
 
-UINT16 count(STACK * s){
+UINT16 scount(STACK * s){
     return s->count;
 }

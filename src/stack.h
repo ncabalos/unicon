@@ -17,7 +17,7 @@ STACK * stack(void);
 void push(STACK * s, void * data);
 void * pop(STACK * s);
 void * top(STACK * s);
-UINT16 count(STACK * s);
+UINT16 scount(STACK * s);
 
 #endif	/* STACK_H */
 
