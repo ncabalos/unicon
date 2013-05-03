@@ -14,7 +14,7 @@ extern "C" {
 
 	void steering_control_init(void);
 	void drive_control_init(void);
-	void serio_init(void);
+	void serio_init(uckernel_task handler);
 
 
 #ifdef	__cplusplus

@@ -45,19 +45,12 @@ _CONFIG2(POSCMOD_XT & DISUVREG_OFF & IOL1WAY_ON & OSCIOFNC_OFF & FCKSM_CSDCMD & 
 // JTAG Port Enable (JTAG port is disabled)
 _CONFIG1(WDTPS_PS32768 & FWPSA_PR128 & WINDIS_OFF & FWDTEN_OFF & ICS_PGx2 & GWRP_OFF & GCP_OFF & JTAGEN_OFF & BKBUG_ON)
 
+extern void terminal_receive_handler(uckernel_task_event event, uckernel_task_data data);
 
 
-void serio_receive_handler(uckernel_task_event event, uckernel_task_data data)
+void layer2_init(uckernel_task_event event, uckernel_task_data data)
 {
-	uint8_t msg[32];
-	uint16_t cnt = serio_data_available();
-
-	if(cnt){
-		serio_read_n(msg,cnt);
-		serio_write_n(msg,cnt);
-	}
-	
-	LATAbits.LATA0 = !LATAbits.LATA0;
+	terminal_init();
 }
 
 void task2(uckernel_task_event event, uckernel_task_data data)
@@ -77,11 +70,12 @@ int main(void)
 	TRISAbits.TRISA0 = 0;
 	TRISAbits.TRISA1 = 0;
 
-	serio_init(serio_receive_handler);
+	serio_init(terminal_receive_handler);
 
 	uckernel_init();
 
-	uckernel_submit_normal_task(task2, NULL, NULL);
+	uckernel_submit_timed_task(layer2_init, NULL, NULL, 1000);
+
 	while (1) {
 		uckernel_process_tasks();
 	}

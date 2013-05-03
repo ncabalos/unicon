@@ -3,11 +3,12 @@
 #define USE_AND_OR
 #include <p24Fxxxx.h>
 #include <PIC24F_plib.h>
-#include "startup.h"
 #include "queue.h"
 #include "uckernel.h"
+#include "startup.h"
+#include "assert.h"
 
-#define QUEUE_SIZE 128
+#define QUEUE_SIZE 300
 static uint8_t tx_queue_data[QUEUE_SIZE];
 static struct queue tx_queue;
 static uint8_t rx_queue_data[QUEUE_SIZE];
@@ -44,8 +45,10 @@ void __attribute__((interrupt, no_auto_psv)) _U2RXInterrupt(void)
 	while (!DataRdyUART2());
 	c = ReadUART2();
 	enqueue(&rx_queue, &c);
-	if(rx_handler)
+	if (rx_handler) {
 		uckernel_submit_isr_task(rx_handler, NULL, NULL);
+	}
+	LATAbits.LATA0 = !LATAbits.LATA0;
 }
 
 void serio_set_rx_handler(uckernel_task handler)
@@ -77,15 +80,22 @@ void serio_write_n(uint8_t * data, uint16_t len)
 	while (len--) {
 		enqueue(&tx_queue, data++);
 	}
-	IFS1bits.U2TXIF = 1;
+	if (!IFS1bits.U2TXIF)
+		IFS1bits.U2TXIF = 1;
 }
 
 void serio_write_term(uint8_t * data, uint8_t term)
 {
-	while(*data != term){
+	while (*data != term) {
 		enqueue(&tx_queue, data++);
 	}
 	IFS1bits.U2TXIF = 1;
+
+}
+
+void serio_write_str(uint8_t * data)
+{
+	serio_write_term(data, '\0');
 }
 
 void serio_read_all(uint8_t *data)
