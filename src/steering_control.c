@@ -3,3 +3,5 @@
 
 
 void steering_control_init(void);
+
+void steering_control_set(int16_t steer);

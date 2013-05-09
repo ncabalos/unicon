@@ -2,18 +2,12 @@
 #include <stdint.h>
 #include <p24Fxxxx.h>
 #include <GenericTypeDefs.h>
+#include "system.h"
 #include "uckernel.h"
 #include "PIC24F_plib.h"
 
-#define USE_PLL 1
 #define TICKTIMER_NUM 2
 #define TICKTIMER_PRESCALE (8UL)
-
-#if USE_PLL == 1
-#define FREQ 32000000
-#else
-#define FREQ 8000000
-#endif
 
 #if TICKTIMER_NUM == 2
 #define TICKTIMER_ENABLE_INT IEC0bits.T2IE

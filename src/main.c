@@ -51,6 +51,16 @@ extern void terminal_receive_handler(uckernel_task_event event, uckernel_task_da
 void layer2_init(uckernel_task_event event, uckernel_task_data data)
 {
 	terminal_init();
+	servo_control_init();
+
+	servo_channel_enable(0);
+	servo_channel_set_duty(0, 0);
+
+	servo_channel_enable(1);
+	servo_channel_set_duty(1, 500);
+
+	servo_channel_enable(2);
+	servo_channel_set_duty(2, 1000);
 }
 
 void task2(uckernel_task_event event, uckernel_task_data data)
@@ -67,8 +77,12 @@ int main(void)
 	tick_timer_init();
 	tick_timer_start();
 
+	
+
 	TRISAbits.TRISA0 = 0;
 	TRISAbits.TRISA1 = 0;
+	TRISAbits.TRISA2 = 0;
+	TRISAbits.TRISA3 = 0;
 
 	serio_init(terminal_receive_handler);
 

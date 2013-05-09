@@ -3,8 +3,6 @@
 
 #include "uckernel.h"
 
-
-
 static uint8_t *commands[2] = {
 	"help",
 	"version"
