@@ -11,9 +11,11 @@
 #include <GenericTypeDefs.h>
 #include "uckernel.h"
 #include "PIC24F_plib.h"
+#include "tdef.h"
 #include "datastructure.h"
 //#include "queue.h"
 #include "stack.h"
+#include "assert.h"
 
 // CONFIG3
 // Write Protection Flash Page Segment Boundary (Highest Page (same as page 170))
@@ -43,30 +45,33 @@ _CONFIG2(POSCMOD_XT & DISUVREG_OFF & IOL1WAY_ON & OSCIOFNC_OFF & FCKSM_CSDCMD & 
 // General Code Segment Write Protect (Writes to program memory are allowed)
 // General Code Segment Code Protect (Code protection is disabled)
 // JTAG Port Enable (JTAG port is disabled)
-_CONFIG1(WDTPS_PS32768 & FWPSA_PR128 & WINDIS_OFF & FWDTEN_OFF & ICS_PGx2 & GWRP_OFF & GCP_OFF & JTAGEN_OFF & BKBUG_ON)
+_CONFIG1(WDTPS_PS256 & FWPSA_PR128 & WINDIS_OFF & FWDTEN_ON & ICS_PGx2 & GWRP_OFF & GCP_OFF & JTAGEN_OFF & BKBUG_ON)
 
 extern void terminal_receive_handler(uckernel_task_event event, uckernel_task_data data);
 
-
-void layer2_init(uckernel_task_event event, uckernel_task_data data)
+void module_layer_init(uckernel_task_event event, uckernel_task_data data)
 {
 	terminal_init();
-	servo_control_init();
+}
 
-	servo_channel_enable(0);
-	servo_channel_set_duty(0, 0);
+void startup_error(uckernel_task_event event, uckernel_task_data data)
+{
+	TRISAbits.TRISA4 = 0;
+	LATAbits.LATA4 = 1;
+}
+
+void hil_layer_init(uckernel_task_event event, uckernel_task_data data)
+{
+	serio_init(terminal_receive_handler);
+	servo_control_init();
 
 	servo_channel_enable(1);
 	servo_channel_set_duty(1, 500);
 
 	servo_channel_enable(2);
 	servo_channel_set_duty(2, 1000);
-}
 
-void task2(uckernel_task_event event, uckernel_task_data data)
-{
-	LATAbits.LATA1 = !LATAbits.LATA1;
-	uckernel_submit_timed_task(task2, NULL, NULL, 200);
+	uckernel_submit_normal_task(module_layer_init, NULL, NULL);
 }
 
 #define CRITICAL_SECTION_START asm volatile ("disi #0x3FFF");
@@ -74,24 +79,33 @@ void task2(uckernel_task_event event, uckernel_task_data data)
 
 int main(void)
 {
-	tick_timer_init();
-	tick_timer_start();
-
-	
+	uint16_t error_occured = false;
+	// Enable Watchdog timer
+	EnableWDT(WDT_ENABLE);
+	// Check if watchdog timer expired
+	if (RCONbits.WDTO) {
+		RCONbits.WDTO = 0;
+		error_occured = true;
+	}
 
 	TRISAbits.TRISA0 = 0;
 	TRISAbits.TRISA1 = 0;
 	TRISAbits.TRISA2 = 0;
 	TRISAbits.TRISA3 = 0;
 
-	serio_init(terminal_receive_handler);
+	tick_timer_init();
+	tick_timer_start();
 
 	uckernel_init();
 
-	uckernel_submit_timed_task(layer2_init, NULL, NULL, 1000);
+	uckernel_submit_timed_task(hil_layer_init, NULL, NULL, 100);
+	if (error_occured)
+		uckernel_submit_timed_task(startup_error, NULL, NULL, 50);
 
 	while (1) {
 		uckernel_process_tasks();
+		// kick the dog!
+		ClrWdt();
 	}
 	return(EXIT_SUCCESS);
 }

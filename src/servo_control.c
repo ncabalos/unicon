@@ -128,16 +128,10 @@ static servo_pin_set_function pointers[8] = {
 	servo_channel_7_set
 };
 
-void __attribute__ ((interrupt,no_auto_psv)) _T4Interrupt(void)
+void __attribute__((interrupt, no_auto_psv)) _T4Interrupt(void)
 {
-
-	//servo_control_update_counters(NULL, NULL);
-	//uckernel_submit_isr_task(servo_control_update_counters, NULL, NULL);
 	_T4IF = 0;
-	//LATAbits.LATA3 = 1;
 	uckernel_submit_normal_task(servo_control_process, SERVOCONTROL_EVENT_TIMEREXPIRED, NULL);
-	LATAbits.LATA3 = !LATAbits.LATA3;
-	
 }
 
 static void set_timer_pr(uint16_t pr)
@@ -147,7 +141,6 @@ static void set_timer_pr(uint16_t pr)
 
 static void servopwm_timer_init(void)
 {
-
 #if SERVOPWMTIMER_NUM == 2
 	T2CONbits.TCKPS = SERVOPWMTIMER_PRESCALE_BITS;
 	PR2 = SERVOPWMTIMER_PR_VALUE;
@@ -217,10 +210,21 @@ void servo_control_init(void)
 
 }
 
-static void servo_timer_reset(uint16_t pr)
+static void update_channel_counter(void)
+{
+	servo_channel_count++;
+	servo_channel_count %= SERVO_CHANNELS;
+}
+
+static void servo_timer_off(void)
 {
 	servopwm_timer_set(false);
 	TMR4 = 0;
+}
+
+static void servo_timer_reset(uint16_t pr)
+{
+	servo_timer_off();
 	set_timer_pr(pr);
 	servopwm_timer_set(true);
 }
@@ -233,11 +237,11 @@ static void servo_control_process(uckernel_task_event event, uckernel_task_data 
 		switch (event) {
 		case SERVOCONTROL_EVENT_READY:
 			if (servo_ptr->enabled) {
-				servo_control_state = SERVOCONTROL_STATE_PULSE;				
+				servo_control_state = SERVOCONTROL_STATE_PULSE;
 				servo_timer_reset(servo_pulse_count);
 				(pointers[servo_channel_count])(true);
 			} else {
-				servo_control_state = SERVOCONTROL_STATE_END;				
+				servo_control_state = SERVOCONTROL_STATE_END;
 				servo_timer_reset(SERVO_INTERVAL_COUNT);
 				(pointers[servo_channel_count])(false);
 			}
@@ -247,7 +251,7 @@ static void servo_control_process(uckernel_task_event event, uckernel_task_data 
 	case SERVOCONTROL_STATE_PULSE:
 		switch (event) {
 		case SERVOCONTROL_EVENT_TIMEREXPIRED:
-			servo_control_state = SERVOCONTROL_STATE_END;			
+			servo_control_state = SERVOCONTROL_STATE_END;
 			servo_timer_reset(servo_end_count);
 			(pointers[servo_channel_count])(false);
 			break;
@@ -256,12 +260,10 @@ static void servo_control_process(uckernel_task_event event, uckernel_task_data 
 	case SERVOCONTROL_STATE_END:
 		switch (event) {
 		case SERVOCONTROL_EVENT_TIMEREXPIRED:
-			servopwm_timer_set(false);
-			TMR4 = 0;
+			servo_timer_off();
 			(pointers[servo_channel_count])(false);
 			servo_control_state = SERVOCONTROL_STATE_SETUP;
-			servo_channel_count++;
-			servo_channel_count %= SERVO_CHANNELS;
+			update_channel_counter();
 
 			servo_ptr = &servos[servo_channel_count];
 			fill_servo_counters(servo_ptr->pwm_duty);

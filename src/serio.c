@@ -4,6 +4,7 @@
 #define USE_AND_OR
 #include <p24Fxxxx.h>
 #include <PIC24F_plib.h>
+#include "tdef.h"
 #include "queue.h"
 #include "uckernel.h"
 #include "startup.h"
@@ -16,6 +17,8 @@ static uint8_t rx_queue_data[QUEUE_SIZE];
 static struct queue rx_queue;
 
 static uckernel_task rx_handler;
+
+static uint16_t serio_initialized = false;
 
 static void get_data(uint8_t * data, uint16_t n)
 {
@@ -49,7 +52,6 @@ void __attribute__((interrupt, no_auto_psv)) _U2RXInterrupt(void)
 	if (rx_handler) {
 		uckernel_submit_isr_task(rx_handler, NULL, NULL);
 	}
-	LATAbits.LATA0 = !LATAbits.LATA0;
 }
 
 void serio_set_rx_handler(uckernel_task handler)
@@ -74,6 +76,7 @@ void serio_init(uckernel_task handler)
 	ConfigIntUART2(UART_RX_INT_EN | UART_RX_INT_PR6 | UART_TX_INT_EN | UART_TX_INT_PR6 | UART_INT_TX_BUF_EMPTY);
 	/*UART initialized to 9600 baudrate @BRGH=0, 8bit,no parity and 1 stopbit*/
 	OpenUART2(UART_EN | UART_BRGH_FOUR, UART_TX_ENABLE, 34);
+	serio_initialized = true;
 }
 
 void serio_write_n(uint8_t * data, uint16_t len)
@@ -81,8 +84,7 @@ void serio_write_n(uint8_t * data, uint16_t len)
 	while (len--) {
 		enqueue(&tx_queue, data++);
 	}
-	if (!IFS1bits.U2TXIF)
-		IFS1bits.U2TXIF = 1;
+	IFS1bits.U2TXIF = 1;
 }
 
 void serio_write_term(uint8_t * data, uint8_t term)
