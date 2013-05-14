@@ -33,11 +33,9 @@ void __attribute__((interrupt, no_auto_psv)) _U2TXInterrupt(void)
 
 	U2TX_Clear_Intr_Status_Bit;
 	if (get_count(&tx_queue)) {
-		while (U2STAbits.UTXBF == 0 && get_count(&tx_queue) > 0) {
-			if (!U2STAbits.UTXBF) {
-				dequeue(&tx_queue, &i);
-				WriteUART2(i);
-			}
+		while (U2STAbits.UTXBF == 0 && get_count(&tx_queue)) {
+			dequeue(&tx_queue, &i);
+			U2TXREG = i;
 		}
 	}
 }
@@ -82,7 +80,9 @@ void serio_init(uckernel_task handler)
 void serio_write_n(uint8_t * data, uint16_t len)
 {
 	while (len--) {
+		IEC1bits.U2TXIE = 0;
 		enqueue(&tx_queue, data++);
+		IEC1bits.U2TXIE = 1;
 	}
 	IFS1bits.U2TXIF = 1;
 }
@@ -90,10 +90,11 @@ void serio_write_n(uint8_t * data, uint16_t len)
 void serio_write_term(uint8_t * data, uint8_t term)
 {
 	while (*data != term) {
+		IEC1bits.U2TXIE = 0;
 		enqueue(&tx_queue, data++);
+		IEC1bits.U2TXIE = 1;
 	}
 	IFS1bits.U2TXIF = 1;
-
 }
 
 void serio_write_str(uint8_t * data)
