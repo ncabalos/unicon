@@ -131,12 +131,12 @@ static servo_pin_set_function pointers[8] = {
 void __attribute__((interrupt, no_auto_psv)) _T4Interrupt(void)
 {
 	_T4IF = 0;
-	uckernel_submit_normal_task(servo_control_process, SERVOCONTROL_EVENT_TIMEREXPIRED, NULL);
+	servo_control_process(SERVOCONTROL_EVENT_TIMEREXPIRED, NULL);
 }
 
 static void set_timer_pr(uint16_t pr)
 {
-	PR4 = pr * 2 - 60;
+	PR4 = pr * 2 - 10;
 }
 
 static void servopwm_timer_init(void)
@@ -206,7 +206,7 @@ void servo_control_init(void)
 
 	fill_servo_counters(servo_ptr->pwm_duty);
 
-	uckernel_submit_normal_task(servo_control_process, SERVOCONTROL_EVENT_READY, NULL);
+	uckernel_submit_isr_task(servo_control_process, SERVOCONTROL_EVENT_READY, NULL);
 
 }
 
@@ -268,7 +268,7 @@ static void servo_control_process(uckernel_task_event event, uckernel_task_data 
 			servo_ptr = &servos[servo_channel_count];
 			fill_servo_counters(servo_ptr->pwm_duty);
 
-			uckernel_submit_normal_task(servo_control_process, SERVOCONTROL_EVENT_READY, NULL);
+			uckernel_submit_isr_task(servo_control_process, SERVOCONTROL_EVENT_READY, NULL);
 			break;
 		}
 		break;

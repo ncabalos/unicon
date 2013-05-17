@@ -48,10 +48,12 @@ _CONFIG2(POSCMOD_XT & DISUVREG_OFF & IOL1WAY_ON & OSCIOFNC_OFF & FCKSM_CSDCMD & 
 _CONFIG1(WDTPS_PS256 & FWPSA_PR128 & WINDIS_OFF & FWDTEN_ON & ICS_PGx2 & GWRP_OFF & GCP_OFF & JTAGEN_OFF & BKBUG_ON)
 
 extern void terminal_receive_handler(uckernel_task_event event, uckernel_task_data data);
+extern void rpm_print(uckernel_task_event event, uckernel_task_data data);
 
 void module_layer_init(uckernel_task_event event, uckernel_task_data data)
 {
 	terminal_init();
+	drive_control_init();
 }
 
 void startup_error(uckernel_task_event event, uckernel_task_data data)
@@ -64,6 +66,8 @@ void hil_layer_init(uckernel_task_event event, uckernel_task_data data)
 {
 	serio_init(terminal_receive_handler);
 	servo_control_init();
+
+	rpm_sensor_init();
 
 	servo_channel_enable(1);
 	servo_channel_set_duty(1, 500);
@@ -80,6 +84,10 @@ void hil_layer_init(uckernel_task_event event, uckernel_task_data data)
 int main(void)
 {
 	uint16_t error_occured = false;
+	TRISAbits.TRISA4 = 0;
+
+
+
 	// Enable Watchdog timer
 	EnableWDT(WDT_ENABLE);
 	// Check if watchdog timer expired

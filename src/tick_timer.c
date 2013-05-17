@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <p24Fxxxx.h>
 #include <GenericTypeDefs.h>
+#include "assert.h"
 #include "system.h"
 #include "uckernel.h"
 #include "PIC24F_plib.h"
@@ -36,16 +37,15 @@
 #define TICKTIMER_PR_VALUE (FREQ /(2UL * TICKTIMER_PRESCALE * 1000UL ))
 
 volatile uint16_t msCount = 1000;
+volatile uint32_t tick_count = 0UL;
 
-void T2Interrupt_ISR(void)
+void __attribute__((interrupt, no_auto_psv)) _T2Interrupt(void)
 {
 	_T2IF = 0;
-	uckernel_submit_isr_task(uckernel_process_delayed_task_list, NULL, NULL);
-}
-
-void _ISR _T2Interrupt(void)
-{
-	T2Interrupt_ISR();
+	tick_count++;
+	uckernel_process_delayed_task_list(NULL, NULL);
+	LATAbits.LATA4 = !LATAbits.LATA4;
+	assert(_T2IF == 0);
 }
 
 void tick_timer_init(void)
@@ -54,6 +54,7 @@ void tick_timer_init(void)
 #if TICKTIMER_NUM == 2
 	T2CONbits.TCKPS = TICKTIMER_PRESCALE_BITS;
 	PR2 = TICKTIMER_PR_VALUE;
+	IPC1bits.T2IP = 7;
 #elif TICKTIMER_NUM == 4
 	T4CONbits.T4CKPS = TICKTIMER_PRESCALE_BITS;
 	T4CONbits.T4OUTPS = TICKTIMER_POSTSCALE_BITS;

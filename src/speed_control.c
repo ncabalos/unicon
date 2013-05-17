@@ -9,7 +9,7 @@ static int16_t measured_speed;
 static uint16_t is_running;
 
 static void speed_control_algorithm(uckernel_task_event event, uckernel_task_data data);
-static void set_servo_duty(uint16_t duty);
+static void set_servo_duty(int16_t duty);
 
 void speed_control_init(void)
 {
@@ -51,11 +51,20 @@ static void speed_control_algorithm(uckernel_task_event event, uckernel_task_dat
  */
 void speed_control_set(int16_t speed)
 {
-	set_speed = speed;
+	speed_control_pid.target = speed;
 }
 
-static void set_servo_duty(uint16_t duty)
+static void set_servo_duty(int16_t duty)
 {
+	uint16_t d;
+
+	d = 500;
+
+	if(duty < -500) duty = -500;
+	if(duty > 500) duty = 500;
+
+	d += duty;
+
 	if(duty > 1000) duty = 1000;
 	servo_channel_set_duty(0, duty);
 }

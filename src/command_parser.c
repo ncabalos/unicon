@@ -7,20 +7,18 @@
 static uint8_t *commands[] = {
 	"help",
 	"version",
-	"servo"
+	"servo",
+	"rpm"
 };
 
 uint16_t parse_result = 0;
 
-extern void terminal_parse_command_callback(uckernel_task_event event, uckernel_task_data data);
+extern void terminal_command_return_callback(uckernel_task_event event, uckernel_task_data data);
+extern void rpm_rx_handler(uckernel_task_event event, uckernel_task_data data);
+extern void rpm_start(uckernel_task_event event, uckernel_task_data data);
+extern void help_command(uckernel_task_event event, uckernel_task_data data);
 
-static void help_command(void)
-{
-	serio_write_str("Available Commands:\r\n");
-	serio_write_str("help\tPrints this message\r\n");
-	serio_write_str("version\tPrints version number\r\n");
-	serio_write_str("servo [n] [m]\tSet servo n to duty m\r\n");
-}
+
 
 static uint16_t search_command_list(uint8_t * cmd)
 {
@@ -75,22 +73,25 @@ void parse_command(uckernel_task_event event, uckernel_task_data data)
 	cmd_index = search_command_list(pch);
 	switch (cmd_index) {
 	case 0:
-		help_command();
-		goto valid;
+		uckernel_submit_timed_task(help_command, NULL, NULL, 100);
+		return;
 	case 1:
 		serio_write_str("valid command\r\n");
 		goto valid;
 	case 2:
-		serio_write_str("servo command\r\n");
 		res = parse_servo_command_parameter();
 		if (res)
 			goto valid;
 		break;
+	case 3:
+		serio_set_rx_handler(rpm_rx_handler);
+		uckernel_submit_timed_task(rpm_start, NULL, NULL, 100);
+		return;
 	default:
 		break;
 	}
 
 	serio_write_str("Unknown command. Type 'help' for list of commands\r\n");
 valid:
-	uckernel_submit_normal_task(terminal_parse_command_callback, NULL, &parse_result);
+	uckernel_submit_normal_task(terminal_command_return_callback, NULL, &parse_result);
 }

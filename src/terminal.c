@@ -5,7 +5,7 @@
 
 static uint8_t *ptr;
 static uint8_t command_buffer[64];
-
+uint8_t msg[32];
 extern void parse_command(uckernel_task_event event, uckernel_task_data data);
 
 static void print_prompt(void)
@@ -13,14 +13,9 @@ static void print_prompt(void)
 	serio_write_str("% ");
 }
 
-void terminal_parse_command_callback(uckernel_task_event event, uckernel_task_data data)
-{
-	print_prompt();
-}
-
 void terminal_receive_handler(uckernel_task_event event, uckernel_task_data data)
 {
-	uint8_t msg[32];
+	
 	uint16_t cnt = serio_data_available();
 
 	if (cnt) {
@@ -37,6 +32,12 @@ void terminal_receive_handler(uckernel_task_event event, uckernel_task_data data
 	} else {
 		ptr++;
 	}
+}
+
+void terminal_command_return_callback(uckernel_task_event event, uckernel_task_data data)
+{
+	serio_set_rx_handler(terminal_receive_handler);
+	print_prompt();
 }
 
 void terminal_init(void)
